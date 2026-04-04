@@ -1,5 +1,5 @@
 // =============================================================================
-// src/pipeline.ts — LexAI Legal Intake Agent (Turso edition)
+// src/pipeline.ts — LexAI Legal Intake Agent (Turso + LangSmith + Tavily)
 // =============================================================================
 
 import express, { type Request, type Response, type NextFunction } from "express";
@@ -23,12 +23,12 @@ import { buildSpeakerPrompt, getSpeakerLLMConfig } from "./prompts/speaker_promp
 import { shouldSummarise, buildSummaryPrompt, SUMMARY_LLM_CONFIG, parseSummaryResponse } from "./prompts/summary_prompt_creator";
 import { getSpeakerFallbackReply, validateUploadedFile, getFileUploadError, getFileAnalysisFallbackDescription, getDatabaseError, SESSION_NOT_FOUND_RESPONSE, getSTTError, getTTSError, PIPELINE_ERROR, RATE_LIMIT_ERROR, logError, logWarn, logInfo } from "./error_recovery";
 
-const PORT               = parseInt(process.env.PORT ?? "3000", 10);
-const OPENAI_API_KEY     = process.env.OPENAI_API_KEY ?? "";
-const DEEPGRAM_API_KEY   = process.env.DEEPGRAM_API_KEY ?? "";
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY ?? "";
+const PORT                = parseInt(process.env.PORT ?? "3000", 10);
+const OPENAI_API_KEY      = process.env.OPENAI_API_KEY ?? "";
+const DEEPGRAM_API_KEY    = process.env.DEEPGRAM_API_KEY ?? "";
+const ELEVENLABS_API_KEY  = process.env.ELEVENLABS_API_KEY ?? "";
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM";
-const TAVILY_API_KEY     = process.env.TAVILY_API_KEY ?? "";
+const TAVILY_API_KEY      = process.env.TAVILY_API_KEY ?? "";
 const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
 const DATA_DIR    = path.resolve(process.cwd(), "data");
 const DB_PATH     = path.join(DATA_DIR, "lexai.db");
@@ -39,8 +39,7 @@ for (const dir of [UPLOADS_DIR, DATA_DIR]) {
   if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); logInfo("[Startup]", `Created: ${dir}`); }
 }
 
-// ── Turso ──────────────────────────────────────────────────────────────────
-
+// ── Turso ─────────────────────────────────────────────────────────────────
 const turso = createClient({
   url: process.env.TURSO_DATABASE_URL ?? `file:${DB_PATH}`,
   authToken: process.env.TURSO_AUTH_TOKEN,
@@ -75,10 +74,10 @@ async function dbListSessions() {
   });
 }
 
-// ── OpenAI + Multer ────────────────────────────────────────────────────────
-
+// ── OpenAI ────────────────────────────────────────────────────────────────
 const openai = wrapOpenAI(new OpenAI({ apiKey: OPENAI_API_KEY }));
-const openaiRaw = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+// ── R2 ────────────────────────────────────────────────────────────────────
 const r2 = process.env.R2_ACCOUNT_ID ? new S3Client({
   region: "auto",
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -87,7 +86,6 @@ const r2 = process.env.R2_ACCOUNT_ID ? new S3Client({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? "",
   },
 }) : null;
-const storage = multer.diskStorage({ destination: (_r, _f, cb) => cb(null, UPLOADS_DIR), filename: (_r, _f, cb) => cb(null, `${uuidv4()}-${Date.now()}`) });
 
 // ── Tavily web search ─────────────────────────────────────────────────────
 async function tavilySearch(query: string): Promise<string> {
@@ -96,85 +94,171 @@ async function tavilySearch(query: string): Promise<string> {
     const res = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: TAVILY_API_KEY, query, max_results: 3, include_answer: true }),
+      body: JSON.stringify({
+        api_key: TAVILY_API_KEY,
+        query,
+        max_results: 4,
+        search_depth: "basic",
+        include_answer: true,
+      }),
     });
-    const data = await res.json() as { answer?: string; results?: Array<{title:string;url:string;content:string}> };
+    if (!res.ok) throw new Error(`Tavily ${res.status}`);
+    const data = await res.json() as {
+      answer?: string;
+      results?: Array<{ title: string; url: string; content: string }>;
+    };
     const parts: string[] = [];
-    if (data.answer) parts.push(data.answer);
-    if (data.results) data.results.forEach(r => parts.push(`${r.title}\n${r.url}\n${r.content}`));
-    return parts.join("\n\n");
-  } catch (err) { logWarn("[Search]", `Tavily failed: ${(err as Error).message}`); return ""; }
+    if (data.answer) parts.push(`Summary: ${data.answer}`);
+    if (data.results) {
+      data.results.slice(0, 3).forEach(r => {
+        // Include title, URL, and content so the LLM can cite sources in its reply
+        parts.push(`---\nSource title: ${r.title}\nSource URL: ${r.url}\nContent: ${r.content.substring(0, 400)}`);
+      });
+    }
+    // Append citation instruction to every search result block
+    parts.push("---\nIMPORTANT: When using any of the above information in your reply, you MUST cite the source title and URL inline. Format: state the information, then add (Source: [title] — [url]).");
+    return parts.join("\n");
+  } catch (err) {
+    logWarn("[Search]", `Tavily failed: ${(err as Error).message}`);
+    return "";
+  }
 }
 
+// Tool definition for OpenAI function calling
 const WEB_SEARCH_TOOL: OpenAI.Chat.ChatCompletionTool[] = [{
   type: "function",
   function: {
     name: "web_search",
-    description: "Search the web for current legal information, lawyer directories, court contacts, police departments, victim assistance programs, filing fees, or any real-world information the client needs.",
-    parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
-  },
+    description: "Search the web for current US legal information, US lawyer directories, US court contacts, US police department numbers, US victim assistance programs, US filing fees, US statutes of limitations, or any real-world US-based information the client is asking for. Only search for information relevant to US federal law or the law of a US state. Do not search for legal frameworks, guidelines, or resources from any other country.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "The search query — be specific and include location when relevant" }
+      },
+      required: ["query"]
+    }
+  }
 }];
 
+// ── Multer ────────────────────────────────────────────────────────────────
+const storage = multer.diskStorage({
+  destination: (_r, _f, cb) => cb(null, UPLOADS_DIR),
+  filename: (_r, _f, cb) => cb(null, `${uuidv4()}-${Date.now()}`)
+});
 const upload = multer({ storage, limits: { fileSize: 52 * 1024 * 1024 }, fileFilter: (_r, _f, cb) => cb(null, true) });
 
-// ── runTurn ────────────────────────────────────────────────────────────────
-
+// ── runTurn ───────────────────────────────────────────────────────────────
 export const runTurn = traceable(async function runTurn(state: LegalAgentState): Promise<LegalAgentState> {
   const sessionId = state.sessionId;
-  const phase = state.currentPhase;
+  const phase     = state.currentPhase;
+
+  // Node 1+2: Analyzer
   let analyzerOutput: Record<string, unknown> = {};
   try {
-    const r = await openai.chat.completions.create({ ...ANALYZER_LLM_CONFIG, messages: [{ role: "user", content: buildAnalyzerPrompt(state) }] });
+    const r = await openai.chat.completions.create({
+      ...ANALYZER_LLM_CONFIG,
+      messages: [{ role: "user", content: buildAnalyzerPrompt(state) }]
+    });
     analyzerOutput = parseAnalyzerResponse(r.choices[0]?.message?.content ?? "");
   } catch (err) { logWarn("[Analyzer]", `Empty output turn ${state.turnCount}: ${(err as Error).message}`); }
 
+  // Node 3: Orchestrator
   const updates = orchestrate(state, analyzerOutput);
   let ws: LegalAgentState = { ...state, ...updates };
 
+  // Optional summarisation
   if (shouldSummarise(ws)) {
     try {
-      const sr = await openai.chat.completions.create({ ...SUMMARY_LLM_CONFIG, messages: [{ role: "user", content: buildSummaryPrompt(ws) }] });
+      const sr = await openai.chat.completions.create({
+        ...SUMMARY_LLM_CONFIG,
+        messages: [{ role: "user", content: buildSummaryPrompt(ws) }]
+      });
       const summary = parseSummaryResponse(sr.choices[0]?.message?.content ?? "");
       if (summary) { ws = { ...ws, conversationSummary: summary }; logInfo("[Summary]", `Generated for ${sessionId}`); }
     } catch (err) { logWarn("[Summary]", `Failed: ${(err as Error).message}`); }
   }
 
+  // Node 4+5: Speaker with optional web search
   let reply = "";
   let speakerFailed = false;
+
   try {
     const sc = getSpeakerLLMConfig(state.voiceMode);
-    const useSearch = !!TAVILY_API_KEY && ["guidance", "situation"].includes(ws.currentPhase);
+    const speakerPrompt = buildSpeakerPrompt(ws);
+
+    // Only offer search tool in guidance phase and if Tavily is configured
+    const useSearch = TAVILY_API_KEY && ["guidance", "situation"].includes(ws.currentPhase);
     const tools = useSearch ? WEB_SEARCH_TOOL : undefined;
+
     type Msg = OpenAI.Chat.ChatCompletionMessageParam;
-    const messages: Msg[] = [{ role: "user", content: buildSpeakerPrompt(ws) }];
-    const sr = await openaiRaw.chat.completions.create({ ...sc, messages, ...(tools ? { tools, tool_choice: "auto" } : {}) });
+    const messages: Msg[] = [{ role: "user", content: speakerPrompt }];
+
+    const sr = await openai.chat.completions.create({
+      ...sc,
+      messages,
+      ...(tools ? { tools, tool_choice: "auto" } : {}),
+    });
+
     const choice = sr.choices[0];
+
+    // Check if the model wants to search
     if (choice?.finish_reason === "tool_calls" && choice.message.tool_calls?.[0]) {
-      const toolCall = choice.message.tool_calls[0];
-      const args = JSON.parse(toolCall.function.arguments) as { query: string };
+      const toolCall  = choice.message.tool_calls[0];
+      const args      = JSON.parse(toolCall.function.arguments) as { query: string };
       logInfo("[Search]", `Searching: "${args.query}"`);
+
       const searchResults = await tavilySearch(args.query);
-      const assistantMsg: Msg = { role: "assistant", content: null, tool_calls: choice.message.tool_calls };
-      const toolMsg: Msg = { role: "tool", tool_call_id: toolCall.id, content: searchResults || "No results — answer from general knowledge." };
-      const followUp = await openaiRaw.chat.completions.create({ ...sc, messages: [...messages, assistantMsg, toolMsg] });
+
+      const followUpMessages: Msg[] = [
+        ...messages,
+        choice.message,
+        {
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: searchResults || "No results found — answer from general knowledge.",
+        },
+      ];
+
+      const followUp = await openai.chat.completions.create({ ...sc, messages: followUpMessages });
       reply = followUp.choices[0]?.message?.content?.trim() ?? "";
+      logInfo("[Search]", `Reply generated with search results`);
     } else {
       reply = choice?.message?.content?.trim() ?? "";
     }
+
     if (!reply) throw new Error("Empty speaker response");
-  } catch (err) { logError("[Speaker]", `Failed turn ${state.turnCount}`, err); reply = getSpeakerFallbackReply(phase); speakerFailed = true; }
+
+  } catch (err) {
+    logError("[Speaker]", `Failed turn ${state.turnCount}`, err);
+    reply = getSpeakerFallbackReply(phase);
+    speakerFailed = true;
+  }
 
   const now = new Date().toISOString();
-  ws = { ...ws, messages: [...ws.messages, { role: "user", content: state.currentUserInput, timestamp: now }, { role: "assistant", content: reply, timestamp: now }], currentAssistantReply: reply, phaseTurnCount: speakerFailed ? Math.max(0, ws.phaseTurnCount - 1) : ws.phaseTurnCount };
+  ws = {
+    ...ws,
+    messages: [
+      ...ws.messages,
+      { role: "user",      content: state.currentUserInput, timestamp: now },
+      { role: "assistant", content: reply,                  timestamp: now },
+    ],
+    currentAssistantReply: reply,
+    phaseTurnCount: speakerFailed ? Math.max(0, ws.phaseTurnCount - 1) : ws.phaseTurnCount,
+  };
+
   return ws;
 }, { name: "runTurn", tags: ["lexai"] });
 
-// ── Express ────────────────────────────────────────────────────────────────
-
+// ── Express ───────────────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use((_req, res, next) => { res.setHeader("Access-Control-Allow-Origin", "*"); res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS"); res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization"); next(); });
+app.use((_req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  next();
+});
 app.options("*", (_req, res) => res.sendStatus(204));
 
 app.post("/session", async (req: Request, res: Response) => {
@@ -218,19 +302,13 @@ app.post("/upload/:sessionId", upload.single("file"), async (req: Request, res: 
   const ve = validateUploadedFile(originalname, mimetype, size);
   if (ve) { logWarn("[Upload]", ve.logMessage); fs.unlink(tempPath, () => {}); return res.status(ve.httpStatus).json({ error: ve.userMessage }); }
   const storedName = `${filename}${path.extname(originalname).toLowerCase()}`;
-  const finalPath = path.join(UPLOADS_DIR, storedName);
+  const finalPath  = path.join(UPLOADS_DIR, storedName);
   let fileBuffer: Buffer;
   try { fileBuffer = fs.readFileSync(tempPath); }
   catch (err) { logError("[Upload]", `Failed to read ${originalname}`, err); const e = getFileUploadError("disk", { fileName: originalname }); return res.status(e.httpStatus).json({ error: e.userMessage }); }
-
   try {
     if (r2 && process.env.R2_BUCKET_NAME) {
-      await r2.send(new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: storedName,
-        Body: fileBuffer,
-        ContentType: mimetype,
-      }));
+      await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: storedName, Body: fileBuffer, ContentType: mimetype }));
       fs.unlink(tempPath, () => {});
     } else {
       fs.renameSync(tempPath, finalPath);
@@ -267,8 +345,11 @@ app.delete("/session/:sessionId", async (req: Request, res: Response) => {
   const { sessionId } = req.params;
   const state = await dbGetSession(sessionId);
   if (!state) return res.status(SESSION_NOT_FOUND_RESPONSE.httpStatus).json(SESSION_NOT_FOUND_RESPONSE.body);
-  try { await dbSaveSession({ ...state, currentPhase: "done", sessionClosed: true, updatedAt: new Date().toISOString() }); logInfo("[Session]", `Closed ${sessionId}`); res.json({ sessionId, closed: true }); }
-  catch (err) { logError("[Session]", `Failed to close ${sessionId}`, err); res.status(500).json({ error: PIPELINE_ERROR.userMessage }); }
+  try {
+    await dbSaveSession({ ...state, currentPhase: "done", sessionClosed: true, updatedAt: new Date().toISOString() });
+    logInfo("[Session]", `Closed ${sessionId}`);
+    res.json({ sessionId, closed: true });
+  } catch (err) { logError("[Session]", `Failed to close ${sessionId}`, err); res.status(500).json({ error: PIPELINE_ERROR.userMessage }); }
 });
 
 app.post("/voice/transcribe", upload.single("audio"), async (req: Request, res: Response) => {
@@ -295,8 +376,11 @@ app.post("/voice/synthesise", async (req: Request, res: Response) => {
   try {
     const elRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}/stream`, { method: "POST", headers: { "xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify({ text, model_id: "eleven_turbo_v2", voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true } }) });
     if (!elRes.ok) throw new Error(`ElevenLabs ${elRes.status}`);
-    res.setHeader("Content-Type", "audio/mpeg"); res.setHeader("Transfer-Encoding", "chunked");
-    const reader = elRes.body; if (!reader) throw new Error("No body"); reader.pipe(res as unknown as NodeJS.WritableStream);
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Transfer-Encoding", "chunked");
+    const reader = elRes.body;
+    if (!reader) throw new Error("No body");
+    reader.pipe(res as unknown as NodeJS.WritableStream);
   } catch (err) { const e = getTTSError({ sessionId }); logError("[TTS]", e.logMessage, err); if (!res.headersSent) res.status(500).json({ error: e.fallbackNote }); }
 });
 
@@ -304,7 +388,14 @@ app.use(express.static(path.resolve(process.cwd(), ".")));
 app.get("/", (_req: Request, res: Response) => res.sendFile(path.resolve(process.cwd(), "index.html")));
 
 app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", version: "1.0.0", uptime: process.uptime(), voiceEnabled: !!(DEEPGRAM_API_KEY && ELEVENLABS_API_KEY), timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    version: "1.1.0",
+    uptime: process.uptime(),
+    voiceEnabled: !!(DEEPGRAM_API_KEY && ELEVENLABS_API_KEY),
+    searchEnabled: !!TAVILY_API_KEY,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

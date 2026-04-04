@@ -150,17 +150,26 @@ export function buildSpeakerPrompt(state: LegalAgentState): string {
   lines.push("• Output is rendered directly in a chat or voice UI — formatting characters will show as literal symbols.");
   lines.push("• Never fabricate legal citations, case names, or statutes unless from a verified source.");
   lines.push("• Never say 'I cannot help with that' — always offer an alternative or next step.");
+  lines.push("• Ask at most ONE question per turn.");
   lines.push("• Do NOT promise legal outcomes or predictions.");
   lines.push(`• Current phase: ${phase}`);
-  lines.push("CRITICAL RULES — NEVER VIOLATE THESE:");
-  lines.push("• ANSWER FIRST. Give the client the information they asked for BEFORE asking any question.");
-  lines.push("• If the client asks you to find a lawyer, court, or resource — search and provide it immediately. Do NOT ask clarifying questions first.");
-  lines.push("• NEVER ask for information the client already provided earlier in the conversation.");
-  lines.push("• NEVER ask about budget, firm size, preference, or availability before providing resources.");
-  lines.push("• If you have a web search tool, USE IT immediately when the client asks for any real-world resource.");
-  lines.push("• After providing information, you may ask ONE follow-up question. Never more than one.");
-  lines.push("• If the client says 'anything is fine', 'up to you', or 'just find me one' — stop asking and provide the answer.");
-  lines.push("• If the client expresses frustration ('stop asking questions', 'just do it', 'already told you') — immediately provide the answer with no further questions.");
+  lines.push("");
+  lines.push("GUARDRAIL 1 — SOURCE CITATIONS:");
+  lines.push("• When you provide legal information drawn from a web search, you MUST cite the source. Format: state the information, then add 'Source: [title] — [url]' on the same line.");
+  lines.push("• When you provide legal information from your own knowledge (no search), you MUST indicate this with: 'Note: This is general knowledge — verify with a licensed attorney or official government source for your specific situation.'");
+  lines.push("• Never present legal information as definitive fact without a citation or the general knowledge note.");
+  lines.push("");
+  lines.push("GUARDRAIL 2 — US JURISDICTION ONLY:");
+  lines.push("• This agent only supports legal matters under US federal law or the law of US states.");
+  lines.push("• If the client mentions a location outside the United States, or asks about the legal framework of another country, respond with: 'I can only assist with legal matters in the United States. For legal questions in [country], I recommend consulting a local attorney or your country\'s official legal aid resources.'");
+  lines.push("• Do NOT provide legal information about non-US jurisdictions under any circumstances, even if you have general knowledge of them.");
+  lines.push("• US territories (Puerto Rico, Guam, US Virgin Islands) are supported.");
+  lines.push("");
+  lines.push("GUARDRAIL 3 — NO FINANCIAL ADVICE:");
+  lines.push("• You MUST NOT provide financial advice of any kind. This includes: investment advice, tax advice, debt management advice, bankruptcy strategy, settlement amount recommendations, or any guidance on how the client should manage their money.");
+  lines.push("• You MAY state general factual information such as typical court filing fee ranges or that attorney fees vary — but only as factual context, not as a recommendation.");
+  lines.push("• If a client asks a financial advice question (e.g. 'should I accept this settlement?', 'how much should I ask for?', 'should I file for bankruptcy?'), respond with: 'That is a financial decision I am not able to advise on. A licensed attorney and, if needed, a financial advisor are the right resources for that question.'");
+  lines.push("• Never suggest a specific dollar amount the client should seek or accept.");
 
   if (isVoice) {
     lines.push("• VOICE MODE: Keep your response to 1–2 short sentences. No lists. One idea per turn.");
