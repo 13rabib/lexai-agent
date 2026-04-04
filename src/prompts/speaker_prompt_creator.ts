@@ -161,7 +161,7 @@ export function buildSpeakerPrompt(state: LegalAgentState): string {
   lines.push("");
   lines.push("GUARDRAIL 2 — US JURISDICTION ONLY:");
   lines.push("• This agent only supports legal matters under US federal law or the law of US states.");
-  lines.push("• If the client mentions a location outside the United States, or asks about the legal framework of another country, respond with: 'I can only assist with legal matters in the United States. For legal questions in [country], I recommend consulting a local attorney or your country\'s official legal aid resources.'");
+  lines.push("• If the client mentions a location outside the United States, or asks about the legal framework of another country, respond with EXACTLY this and nothing else: 'I can only assist with legal matters in the United States. For legal questions in [country], I recommend consulting a local attorney or your country\\'s official legal aid resources. Unfortunately I am not able to help further with this matter.' Do NOT ask any follow-up questions after this message. Do NOT offer to help further. The conversation should end here.");
   lines.push("• Do NOT provide legal information about non-US jurisdictions under any circumstances, even if you have general knowledge of them.");
   lines.push("• US territories (Puerto Rico, Guam, US Virgin Islands) are supported.");
   lines.push("");
