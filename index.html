@@ -875,7 +875,7 @@ async function beginVoice() {
 function startMediaRecorder(stream) {
   isRecording=true; audioChunks=[];
   voicebtn.classList.add('active');
-  showVoiceOverlay('Listening…','Speak clearly — I'm here');
+  showVoiceOverlay('Listening…','Speak clearly — I\'m here');
   startVolVisualiser(stream);
   mediaRecorder = new MediaRecorder(stream);
   mediaRecorder.addEventListener('dataavailable', e => audioChunks.push(e.data));
