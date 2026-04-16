@@ -370,15 +370,22 @@ app.post("/voice/transcribe", upload.single("audio"), async (req: Request, res: 
 });
 
 app.post("/voice/synthesise", async (req: Request, res: Response) => {
-  if (!ELEVENLABS_API_KEY) return res.status(503).json({ error: "TTS not configured." });
+  if (!DEEPGRAM_API_KEY) return res.status(503).json({ error: "TTS not configured." });
   const { text, sessionId } = req.body ?? {};
   if (!text || typeof text !== "string") return res.status(400).json({ error: "text is required." });
   try {
-    const elRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}/stream`, { method: "POST", headers: { "xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json", Accept: "audio/mpeg" }, body: JSON.stringify({ text, model_id: "eleven_turbo_v2", voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true } }) });
-    if (!elRes.ok) throw new Error(`ElevenLabs ${elRes.status}`);
+    const dgRes = await fetch("https://api.deepgram.com/v1/speak?model=aura-asteria-en&encoding=mp3", {
+      method: "POST",
+      headers: { "Authorization": `Token ${DEEPGRAM_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!dgRes.ok) {
+      const errText = await dgRes.text();
+      throw new Error(`Deepgram TTS ${dgRes.status}: ${errText}`);
+    }
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Transfer-Encoding", "chunked");
-    const reader = elRes.body;
+    const reader = dgRes.body;
     if (!reader) throw new Error("No body");
     reader.pipe(res as unknown as NodeJS.WritableStream);
   } catch (err) { const e = getTTSError({ sessionId }); logError("[TTS]", e.logMessage, err); if (!res.headersSent) res.status(500).json({ error: e.fallbackNote }); }
@@ -392,7 +399,7 @@ app.get("/health", (_req: Request, res: Response) => {
     status: "ok",
     version: "1.1.0",
     uptime: process.uptime(),
-    voiceEnabled: !!(DEEPGRAM_API_KEY && ELEVENLABS_API_KEY),
+    voiceEnabled: !!DEEPGRAM_API_KEY,
     searchEnabled: !!TAVILY_API_KEY,
     timestamp: new Date().toISOString(),
   });
