@@ -895,7 +895,7 @@ function startSilenceDetection() {
       if (!silenceStart) silenceStart = Date.now();
       const elapsed = Date.now() - silenceStart;
       const remaining = Math.max(0, SILENCE_MS - elapsed);
-      voicesub.textContent = elapsed > 300 ? `Sending in ${(remaining/1000).toFixed(1)}s…` : 'Speak clearly — I'm here';
+      voicesub.textContent = elapsed > 300 ? `Sending in ${(remaining/1000).toFixed(1)}s…` : 'Speak clearly — I\'m here';
       if (elapsed >= SILENCE_MS) { clearSilenceTimer(); stopVoice(); }
     } else {
       silenceStart = null;
