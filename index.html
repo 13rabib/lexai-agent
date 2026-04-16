@@ -484,6 +484,10 @@ let mediaRecorder     = null;
 let audioChunks       = [];
 let recognizer        = null;
 let audioCtx          = null;
+let silenceTimer      = null;
+let silenceStart      = null;
+const SILENCE_MS      = 1500;
+const SILENCE_THRESH  = 8;
 let analyserNode      = null;
 let volRAF            = null;
 let conversationLog   = [];
@@ -871,12 +875,38 @@ async function beginVoice() {
 function startMediaRecorder(stream) {
   isRecording=true; audioChunks=[];
   voicebtn.classList.add('active');
-  showVoiceOverlay('Listening…','Speak clearly — I\'m here');
+  showVoiceOverlay('Listening…','Speak clearly — I'm here');
   startVolVisualiser(stream);
   mediaRecorder = new MediaRecorder(stream);
   mediaRecorder.addEventListener('dataavailable', e => audioChunks.push(e.data));
-  mediaRecorder.addEventListener('stop', () => { stream.getTracks().forEach(t=>t.stop()); stopVolVisualiser(); processMediaRecording(); });
+  mediaRecorder.addEventListener('stop', () => { stream.getTracks().forEach(t=>t.stop()); stopVolVisualiser(); clearSilenceTimer(); processMediaRecording(); });
   mediaRecorder.start(250);
+  startSilenceDetection();
+}
+
+function startSilenceDetection() {
+  silenceStart = null;
+  silenceTimer = setInterval(() => {
+    if (!analyserNode || !isRecording) return;
+    const data = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteFrequencyData(data);
+    const vol = data.reduce((a,b) => a+b, 0) / data.length;
+    if (vol < SILENCE_THRESH) {
+      if (!silenceStart) silenceStart = Date.now();
+      const elapsed = Date.now() - silenceStart;
+      const remaining = Math.max(0, SILENCE_MS - elapsed);
+      voicesub.textContent = elapsed > 300 ? `Sending in ${(remaining/1000).toFixed(1)}s…` : 'Speak clearly — I'm here';
+      if (elapsed >= SILENCE_MS) { clearSilenceTimer(); stopVoice(); }
+    } else {
+      silenceStart = null;
+      voicesub.textContent = 'Speak clearly — I'm here';
+    }
+  }, 100);
+}
+
+function clearSilenceTimer() {
+  if (silenceTimer) { clearInterval(silenceTimer); silenceTimer = null; }
+  silenceStart = null;
 }
 
 function stopVoice() {
@@ -887,6 +917,7 @@ function stopVoice() {
 
 function cancelVoice() {
   isRecording=false;
+  clearSilenceTimer();
   if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
   if (recognizer) { recognizer.abort(); recognizer=null; }
   stopVolVisualiser(); hideVoiceOverlay(); voicebtn.classList.remove('active');
