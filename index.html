@@ -751,11 +751,12 @@ function updateSendBtn() {
   sendbtn.disabled = !msginput.value.trim() && !pendingFile;
 }
 
-async function sendMessage(text) {
+async function sendMessage(text, fromVoice=false) {
   text = (text || '').trim();
   if (!text && !pendingFile) return;
   if (isLoading) return;
-  if (!isRecording) lastInputWasVoice = false;
+  if (fromVoice) lastInputWasVoice = true;
+  else if (!isRecording) lastInputWasVoice = false;
   if (!sessionId) await startSession();
 
   removeWelcome();
@@ -902,8 +903,7 @@ async function processMediaRecording() {
       if (data.transcript?.trim()) {
         transcriptbox.textContent = '\u201c' + data.transcript + '\u201d';
         await delay(700); hideVoiceOverlay();
-        lastInputWasVoice = true;
-        await sendMessage(data.transcript); return;
+        await sendMessage(data.transcript, true); return;
       }
     } catch {}
   }
@@ -921,7 +921,7 @@ function beginWebSpeech() {
   recognizer.onend = async () => {
     const t = transcriptbox.textContent.replace(/^\u201c|\u201d$/g,'');
     isRecording=false; voicebtn.classList.remove('active'); recognizer=null;
-    if (t.trim()) { await delay(500); hideVoiceOverlay(); lastInputWasVoice=true; await sendMessage(t.trim()); }
+    if (t.trim()) { await delay(500); hideVoiceOverlay(); await sendMessage(t.trim(), true); }
     else hideVoiceOverlay();
   };
   recognizer.onerror = () => { isRecording=false; voicebtn.classList.remove('active'); recognizer=null; hideVoiceOverlay(); };
