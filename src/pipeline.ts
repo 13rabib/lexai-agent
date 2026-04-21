@@ -65,11 +65,11 @@ async function dbSaveSession(state: LegalAgentState): Promise<void> {
 }
 
 async function dbListSessions() {
-  const result = await turso.execute("SELECT state_json FROM sessions ORDER BY updated_at DESC");
+  const result = await turso.execute("SELECT state_json FROM sessions ORDER BY updated_at DESC LIMIT 100");
   return result.rows.flatMap((row) => {
     try {
       const s = JSON.parse(row.state_json as string) as LegalAgentState;
-      return [{ sessionId: s.sessionId, currentPhase: s.currentPhase, turnCount: s.turnCount, legalIssueType: s.legalIssueType, jurisdiction: s.jurisdiction, urgencyLevel: s.urgencyLevel, riskFlags: s.riskFlags, liabilityScore: s.liabilityScore, caseStrengthScore: s.caseStrengthScore, createdAt: s.createdAt, updatedAt: s.updatedAt }];
+      return [{ sessionId: s.sessionId, currentPhase: s.currentPhase, turnCount: s.turnCount, legalDomain: s.legalDomain, legalIssueType: s.legalIssueType, jurisdiction: s.jurisdiction, urgencyLevel: s.urgencyLevel, riskFlags: s.riskFlags ?? [], liabilityScore: s.liabilityScore, caseStrengthScore: s.caseStrengthScore, settlementLikelihoodScore: s.settlementLikelihoodScore, statuteOfLimitationsFlag: s.statuteOfLimitationsFlag, incidentSummary: s.incidentSummary, incidentLocation: s.incidentLocation, policeReportFiled: s.policeReportFiled, createdAt: s.createdAt, updatedAt: s.updatedAt }];
     } catch { return []; }
   });
 }
