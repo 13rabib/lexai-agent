@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Litmetrics — Lawyer Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream:            #FAF7F2;
+    --cream-dark:       #F0EAE0;
+    --warm-white:       #FFFDF9;
+    --terracotta:       #C4673A;
+    --terracotta-light: #E07A4E;
+    --terracotta-pale:  #F5E6DC;
+    --charcoal:         #2C2420;
+    --charcoal-mid:     #5C4A3E;
+    --charcoal-soft:    #8A7268;
+    --sage:             #7A9E8E;
+    --sage-pale:        #EAF2EF;
+    --border:           rgba(44,36,32,0.1);
+    --shadow:           0 2px 20px rgba(44,36,32,0.07);
+    --shadow-lg:        0 8px 48px rgba(44,36,32,0.14);
+    --radius:           14px;
+  }
+
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height: 100%; }
+
+  body {
+    height: 100%;
+    background: var(--cream);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--charcoal);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── LAYOUT ── */
+  .dash-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .dash-header {
+    padding: 12px 20px;
+    background: var(--warm-white);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0; z-index: 10;
+  }
+
+  .dash-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-mark { width: 32px; height: 32px; background: var(--terracotta); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo-mark svg { width: 16px; height: 16px; fill: white; }
+  .logo-text { display: flex; flex-direction: column; line-height: 1; }
+  .logo-name { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 500; color: var(--charcoal); letter-spacing: -0.3px; }
+  .logo-sub  { font-size: 9px; font-weight: 300; color: var(--charcoal-soft); letter-spacing: 0.9px; text-transform: uppercase; margin-top: 2px; }
+
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .btn-primary {
+    padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    background: var(--terracotta); color: white; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .btn-primary:hover { background: var(--terracotta-light); }
+  .btn-primary svg { width: 13px; height: 13px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+  .btn-secondary {
+    padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    background: var(--warm-white); color: var(--charcoal-mid); border: 1.5px solid var(--border);
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    display: flex; align-items: center; gap: 5px; text-decoration: none;
+  }
+  .btn-secondary:hover { border-color: var(--charcoal-mid); }
+  .btn-secondary svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 300px; flex-shrink: 0;
+    background: var(--warm-white);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .sidebar-title {
+    font-size: 10px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--charcoal-soft); margin-bottom: 10px;
+  }
+
+  .search-input {
+    width: 100%; padding: 8px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--cream);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--charcoal);
+    outline: none; transition: border 0.2s;
+  }
+  .search-input:focus { border-color: var(--charcoal-soft); }
+  .search-input::placeholder { color: var(--charcoal-soft); }
+
+  .session-list {
+    flex: 1; overflow-y: auto;
+    padding: 10px 8px;
+  }
+  .session-list::-webkit-scrollbar { width: 3px; }
+  .session-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .empty-list {
+    text-align: center; padding: 40px 20px;
+    color: var(--charcoal-soft); font-size: 13px; font-weight: 300;
+  }
+
+  .list-loading {
+    text-align: center; padding: 40px 20px;
+    color: var(--charcoal-soft); font-size: 12px;
+  }
+
+  /* ── SESSION CARD ── */
+  .session-card {
+    padding: 12px 14px; border-radius: var(--radius); margin-bottom: 6px;
+    background: var(--cream); border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.18s; position: relative;
+  }
+  .session-card:hover { border-color: var(--charcoal-soft); box-shadow: var(--shadow); }
+  .session-card.selected { border-color: var(--terracotta); background: var(--terracotta-pale); }
+  .session-card.emergency { border-left: 3px solid #E53E3E; }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .issue-badge {
+    font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 6px;
+    background: var(--cream-dark); color: var(--charcoal-mid);
+    max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sol-badge {
+    font-size: 9px; font-weight: 500; padding: 2px 7px; border-radius: 5px; letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .sol-ok       { background: rgba(122,158,142,0.15); color: var(--sage); }
+  .sol-warning  { background: rgba(232,168,56,0.15);  color: #B07A10; }
+  .sol-critical { background: rgba(229,62,62,0.12);   color: #C53030; }
+
+  .card-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .card-jurisdiction { font-size: 11px; color: var(--charcoal-soft); font-weight: 300; }
+  .urgency-pill {
+    font-size: 9px; font-weight: 500; padding: 2px 7px; border-radius: 5px;
+    letter-spacing: 0.4px; text-transform: uppercase;
+  }
+  .urgency-emergency { background: rgba(229,62,62,0.12); color: #C53030; }
+  .urgency-urgent    { background: rgba(232,168,56,0.12); color: #B07A10; }
+  .urgency-standard  { background: rgba(122,158,142,0.12); color: var(--sage); }
+  .urgency-exploratory { background: var(--cream-dark); color: var(--charcoal-soft); }
+
+  .mini-scores { display: flex; gap: 8px; margin-bottom: 8px; }
+  .mini-score-item { flex: 1; }
+  .mini-score-label { font-size: 9px; color: var(--charcoal-soft); font-weight: 300; margin-bottom: 3px; }
+  .mini-bar { height: 3px; background: var(--cream-dark); border-radius: 2px; overflow: hidden; }
+  .mini-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
+  .mini-score-val { font-size: 10px; color: var(--charcoal-mid); font-weight: 500; margin-top: 2px; }
+
+  .card-footer { display: flex; align-items: center; gap: 8px; }
+  .phase-pill {
+    font-size: 9px; font-weight: 500; padding: 2px 7px; border-radius: 5px;
+    background: var(--cream-dark); color: var(--charcoal-soft); text-transform: capitalize;
+  }
+  .phase-pill.done { background: var(--sage-pale); color: var(--sage); }
+  .card-flag-count { font-size: 10px; color: var(--charcoal-soft); }
+  .card-flag-count.has-flags { color: var(--terracotta); font-weight: 500; }
+  .card-time { font-size: 10px; color: var(--charcoal-soft); margin-left: auto; }
+
+  /* ── DETAIL PANEL ── */
+  .detail-panel {
+    flex: 1; overflow-y: auto;
+    background: var(--cream);
+    padding: 24px 28px;
+  }
+  .detail-panel::-webkit-scrollbar { width: 3px; }
+  .detail-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; text-align: center; color: var(--charcoal-soft);
+  }
+  .empty-state-icon {
+    width: 56px; height: 56px; background: var(--cream-dark); border-radius: 18px;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 14px;
+  }
+  .empty-state-icon svg { width: 26px; height: 26px; stroke: var(--charcoal-soft); fill: none; stroke-width: 1.4; stroke-linecap: round; }
+  .empty-state h3 { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 500; margin-bottom: 7px; color: var(--charcoal); }
+  .empty-state p  { font-size: 13px; font-weight: 300; line-height: 1.6; max-width: 280px; }
+
+  /* ── DETAIL CONTENT ── */
+  .detail-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 22px; flex-wrap: wrap; gap: 10px;
+  }
+  .detail-title { font-family: 'Playfair Display', serif; font-size: 21px; font-weight: 500; line-height: 1.2; margin-bottom: 6px; }
+  .detail-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .detail-meta-pill {
+    font-size: 10px; font-weight: 400; padding: 3px 9px; border-radius: 6px;
+    background: var(--cream-dark); color: var(--charcoal-soft);
+  }
+
+  .section {
+    background: var(--warm-white); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 20px; margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: 10px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--charcoal-soft); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-count {
+    font-size: 10px; font-weight: 400; padding: 1px 7px; border-radius: 4px;
+    background: var(--cream-dark); color: var(--charcoal-soft); letter-spacing: 0;
+  }
+
+  /* ── CASE BRIEF ── */
+  .case-brief {
+    background: var(--terracotta-pale); border: 1px solid rgba(196,103,58,0.2);
+    border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px;
+  }
+  .brief-title { font-family: 'Playfair Display', serif; font-size: 13px; font-weight: 500; color: var(--terracotta); letter-spacing: 0.3px; margin-bottom: 10px; }
+  .brief-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
+  .brief-item { font-size: 12px; }
+  .brief-label { color: var(--charcoal-soft); font-weight: 300; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .brief-value { color: var(--charcoal); font-weight: 400; }
+  .brief-summary { font-size: 12px; color: var(--charcoal); font-weight: 300; line-height: 1.6; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(196,103,58,0.15); }
+
+  /* ── GAUGES ── */
+  .gauges-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .gauge-wrap { flex: 1; min-width: 100px; display: flex; flex-direction: column; align-items: center; }
+  .gauge-svg { width: 120px; height: 72px; overflow: visible; }
+  .gauge-label { font-size: 11px; color: var(--charcoal-soft); font-weight: 300; margin-top: 6px; text-align: center; }
+
+  .sol-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .sol-label { font-size: 11px; color: var(--charcoal-soft); font-weight: 300; }
+  .sol-value {
+    font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 6px;
+  }
+  .sol-ok-val       { background: rgba(122,158,142,0.15); color: var(--sage); }
+  .sol-warning-val  { background: rgba(232,168,56,0.15);  color: #B07A10; }
+  .sol-critical-val { background: rgba(229,62,62,0.12);   color: #C53030; }
+  .sol-empty        { background: var(--cream-dark); color: var(--charcoal-soft); }
+
+  /* ── RISK FLAGS ── */
+  .flag-list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .flag-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 9px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5;
+  }
+  .flag-critical { background: rgba(229,62,62,0.07); color: #7B2020; }
+  .flag-warning  { background: rgba(232,168,56,0.08); color: #7A5010; }
+  .flag-info     { background: var(--cream); color: var(--charcoal-mid); }
+  .flag-icon { font-size: 14px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+  .no-flags { font-size: 12px; color: var(--charcoal-soft); font-weight: 300; }
+
+  /* ── FACTS GRID ── */
+  .facts-grid { display: flex; flex-direction: column; gap: 6px; }
+  .fact-row { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .fact-row:last-child { border-bottom: none; }
+  .fact-label { color: var(--charcoal-soft); font-weight: 300; min-width: 140px; flex-shrink: 0; }
+  .fact-value { color: var(--charcoal); font-weight: 400; }
+  .facts-pending { font-size: 12px; color: var(--charcoal-soft); font-weight: 300; font-style: italic; }
+
+  /* ── TIMELINE ── */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-step { display: flex; align-items: center; gap: 12px; padding: 7px 0; position: relative; }
+  .tl-step:not(:last-child)::after {
+    content: ''; position: absolute; left: 7px; top: 28px;
+    width: 2px; height: calc(100% - 10px); background: var(--border);
+  }
+  .tl-dot {
+    width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; z-index: 1;
+    border: 2px solid var(--border); background: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tl-step.completed .tl-dot { background: var(--sage); border-color: var(--sage); }
+  .tl-step.active    .tl-dot { background: var(--terracotta); border-color: var(--terracotta); }
+  .tl-step.completed .tl-dot::after { content: '✓'; font-size: 8px; color: white; font-weight: 700; }
+  .tl-label { font-size: 12px; }
+  .tl-step.completed .tl-label { color: var(--charcoal-mid); }
+  .tl-step.active    .tl-label { color: var(--terracotta); font-weight: 500; }
+  .tl-step.pending   .tl-label { color: var(--charcoal-soft); font-weight: 300; }
+
+  /* ── FILES ── */
+  .file-list { display: flex; flex-direction: column; gap: 8px; }
+  .file-card { display: flex; gap: 12px; padding: 10px; background: var(--cream); border-radius: 8px; border: 1px solid var(--border); }
+  .file-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--cream-dark); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 12px; font-weight: 500; color: var(--charcoal); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-desc { font-size: 11px; color: var(--charcoal-soft); font-weight: 300; line-height: 1.4; margin-bottom: 3px; }
+  .file-meta { font-size: 10px; color: var(--charcoal-soft); }
+  .no-files  { font-size: 12px; color: var(--charcoal-soft); font-weight: 300; }
+
+  /* ── TRANSCRIPT ── */
+  .transcript-log { display: flex; flex-direction: column; gap: 10px; }
+  .transcript-entry { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .transcript-entry:last-child { border-bottom: none; }
+  .t-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .t-role { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; }
+  .transcript-entry.assistant .t-role { color: var(--terracotta); }
+  .transcript-entry.user      .t-role { color: var(--charcoal-mid); }
+  .t-time { font-size: 10px; color: var(--charcoal-soft); }
+  .t-content { font-size: 12px; line-height: 1.6; color: var(--charcoal); font-weight: 300; }
+
+  /* ── LOADING ── */
+  .detail-loading {
+    display: flex; align-items: center; justify-content: center;
+    height: 200px; color: var(--charcoal-soft); font-size: 13px; font-weight: 300;
+  }
+  .detail-error {
+    display: flex; align-items: center; justify-content: center;
+    height: 200px; color: var(--terracotta); font-size: 13px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--terracotta); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; margin-right: 8px; }
+</style>
+</head>
+<body>
+<div class="dash-app">
+
+  <!-- HEADER -->
+  <header class="dash-header">
+    <div class="logo">
+      <div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div class="logo-text">
+        <span class="logo-name">Litmetrics</span>
+        <span class="logo-sub">Lawyer Dashboard</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <a href="index.html" class="btn-secondary">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        New Intake
+      </a>
+      <button class="btn-primary" id="refreshbtn">
+        <svg viewBox="0 0 24 24" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="dash-body">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">All Sessions</div>
+        <input type="text" class="search-input" id="searchinput" placeholder="Search by issue, jurisdiction…">
+      </div>
+      <div class="session-list" id="sessionlist">
+        <div class="list-loading"><span class="spinner"></span>Loading sessions…</div>
+      </div>
+    </aside>
+
+    <!-- DETAIL PANEL -->
+    <main class="detail-panel" id="detailpanel">
+      <div class="empty-state" id="emptystate">
+        <div class="empty-state-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 9h6M9 13h4"/></svg>
+        </div>
+        <h3>Select a session</h3>
+        <p>Choose a client intake session from the list to view Litmetrics scores, risk flags, and case details.</p>
+      </div>
+      <div id="sessiondetail" style="display:none"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+const API = `${window.location.protocol}//${window.location.host}`;
+const $ = id => document.getElementById(id);
+
+let allSessions = [];
+let selectedId  = null;
+
+// ── PHASE LABELS ──────────────────────────────────────────
+const PHASE_ORDER = ['intake','situation','insurance','witnesses','guidance','wrapup','done'];
+const PHASE_LABELS = {
+  intake: 'Intake', situation: 'Situation', insurance: 'Insurance',
+  witnesses: 'Witnesses', guidance: 'Guidance', wrapup: 'Wrap-up', done: 'Complete',
+};
+
+// ── FORMATTERS ────────────────────────────────────────────
+function formatIssueType(s) {
+  if (!s) return 'Unknown matter';
+  const parts = s.split('-');
+  const domain = parts[0];
+  const rest   = parts.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return rest ? `${rest} (${domain.charAt(0).toUpperCase() + domain.slice(1)})` : domain.charAt(0).toUpperCase() + domain.slice(1);
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+
+function formatBytes(b) {
+  if (!b) return '';
+  if (b < 1024) return `${b} B`;
+  if (b < 1048576) return `${(b/1024).toFixed(1)} KB`;
+  return `${(b/1048576).toFixed(1)} MB`;
+}
+
+function fileIcon(mimeType) {
+  if (!mimeType) return '📎';
+  if (mimeType.startsWith('image/')) return '🖼️';
+  if (mimeType.startsWith('video/')) return '🎬';
+  if (mimeType.includes('pdf'))      return '📄';
+  return '📎';
+}
+
+// ── GAUGE SVG ─────────────────────────────────────────────
+function renderGauge(label, value, color) {
+  const pct    = value != null ? Math.max(0, Math.min(100, value)) : null;
+  const arcLen = 125.66; // π × 40
+  const filled = pct != null ? (pct / 100) * arcLen : 0;
+  const stroke = pct != null ? color : 'var(--cream-dark)';
+  const display = pct != null ? pct : '—';
+  return `
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 100 60" class="gauge-svg">
+        <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="var(--cream-dark)" stroke-width="9" stroke-linecap="round"/>
+        <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="${stroke}" stroke-width="9" stroke-linecap="round"
+              stroke-dasharray="${filled} ${arcLen}" stroke-dashoffset="0"/>
+        <text x="50" y="44" text-anchor="middle" font-size="17" font-weight="600"
+              fill="var(--charcoal)" font-family="DM Sans, sans-serif">${display}</text>
+      </svg>
+      <div class="gauge-label">${label}</div>
+    </div>`;
+}
+
+// ── SESSION CARD ──────────────────────────────────────────
+function renderSessionCard(s) {
+  const card = document.createElement('div');
+  card.className = 'session-card' + (s.urgencyLevel === 'emergency' ? ' emergency' : '');
+  card.dataset.id = s.sessionId;
+
+  const solClass = s.statuteOfLimitationsFlag === 'critical' ? 'sol-critical'
+                 : s.statuteOfLimitationsFlag === 'warning'  ? 'sol-warning' : 'sol-ok';
+  const solText  = s.statuteOfLimitationsFlag ? `SoL: ${s.statuteOfLimitationsFlag}` : 'SoL: —';
+
+  const urgClass = `urgency-${s.urgencyLevel || 'standard'}`;
+  const flagCount = s.riskFlags?.length ?? 0;
+  const phaseLabel = PHASE_LABELS[s.currentPhase] || s.currentPhase;
+
+  const liab = s.liabilityScore;
+  const str  = s.caseStrengthScore;
+
+  const riskLevel = s.riskLevel || 'Low';
+  const riskColors = { Critical: '#f8d7da', High: '#fff3cd', Medium: '#d1ecf1', Low: '#d4edda' };
+  const riskTextColors = { Critical: '#721c24', High: '#856404', Medium: '#0c5460', Low: '#155724' };
+  const riskBg = riskColors[riskLevel] || riskColors.Low;
+  const riskText = riskTextColors[riskLevel] || riskTextColors.Low;
+
+  const keyFacts = s.keyFacts || [];
+
+  card.innerHTML = `
+    <div class="card-top">
+      <span class="issue-badge">${formatIssueType(s.legalIssueType)}</span>
+      <span class="sol-badge ${solClass}">${solText}</span>
+    </div>
+    <div class="card-meta">
+      <span class="card-jurisdiction">${s.jurisdiction || 'Jurisdiction unknown'}</span>
+      <span class="urgency-pill ${urgClass}">${s.urgencyLevel || 'standard'}</span>
+    </div>
+    <div class="mini-scores">
+      <div class="mini-score-item">
+        <div class="mini-score-label">Liability</div>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${liab ?? 0}%; background:var(--terracotta)"></div></div>
+        <div class="mini-score-val">${liab ?? '—'}</div>
+      </div>
+      <div class="mini-score-item">
+        <div class="mini-score-label">Strength</div>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${str ?? 0}%; background:var(--sage)"></div></div>
+        <div class="mini-score-val">${str ?? '—'}</div>
+      </div>
+    </div>
+    <div style="padding:6px 0 4px;">
+      <span style="display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;background:${riskBg};color:${riskText};">Risk: ${riskLevel}</span>
+    </div>
+    ${keyFacts.length > 0 ? `<div style="font-size:11px;color:var(--charcoal-soft);padding-bottom:4px;">${keyFacts.map(f => `<div>· ${f}</div>`).join('')}</div>` : ''}
+    <div class="card-footer">
+      <span class="phase-pill ${s.currentPhase === 'done' ? 'done' : ''}">${phaseLabel}</span>
+      <span class="card-flag-count ${flagCount > 0 ? 'has-flags' : ''}">${flagCount} flag${flagCount !== 1 ? 's' : ''}</span>
+      <span class="card-time">${timeAgo(s.updatedAt)}</span>
+    </div>`;
+
+  card.addEventListener('click', () => loadDetail(s.sessionId));
+  return card;
+}
+
+// ── SESSION LIST ──────────────────────────────────────────
+function renderList(sessions) {
+  const list = $('sessionlist');
+  list.innerHTML = '';
+  if (!sessions.length) {
+    list.innerHTML = '<div class="empty-list">No sessions found.</div>';
+    return;
+  }
+  sessions.forEach(s => list.appendChild(renderSessionCard(s)));
+}
+
+async function loadSessions() {
+  $('sessionlist').innerHTML = '<div class="list-loading"><span class="spinner"></span>Loading…</div>';
+  try {
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 10000);
+    const res  = await fetch(`${API}/sessions`, { signal: ctrl.signal });
+    clearTimeout(tid);
+    allSessions = await res.json();
+    renderList(allSessions);
+  } catch (e) {
+    const msg = e instanceof Error && e.name === 'AbortError'
+      ? 'Server not responding — is it running?'
+      : 'Could not load sessions — check server.';
+    $('sessionlist').innerHTML = `<div class="empty-list">${msg}</div>`;
+  }
+}
+
+$('searchinput').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  const filtered = allSessions.filter(s =>
+    (s.legalIssueType || '').toLowerCase().includes(q) ||
+    (s.jurisdiction   || '').toLowerCase().includes(q) ||
+    (s.urgencyLevel   || '').toLowerCase().includes(q) ||
+    (s.currentPhase   || '').toLowerCase().includes(q)
+  );
+  renderList(filtered);
+  // Re-mark selected
+  if (selectedId) {
+    const card = document.querySelector(`.session-card[data-id="${selectedId}"]`);
+    if (card) card.classList.add('selected');
+  }
+});
+
+$('refreshbtn').addEventListener('click', loadSessions);
+
+// ── CASE BRIEF ────────────────────────────────────────────
+function renderCaseBrief(data) {
+  const fields = [
+    { label: 'Client role',    value: data.clientRole || '—' },
+    { label: 'Incident date',  value: data.incidentDate || '—' },
+    { label: 'Location',       value: data.incidentLocation || data.jurisdiction || '—' },
+    { label: 'Urgency',        value: data.urgencyLevel ? data.urgencyLevel.charAt(0).toUpperCase()+data.urgencyLevel.slice(1) : '—' },
+    { label: 'Insurance',      value: data.insuranceCoverageType && data.insuranceCoverageType !== '' ? data.insuranceCoverageType : '—' },
+    { label: 'Can afford atty',value: data.canAffordAttorney === true ? 'Yes' : data.canAffordAttorney === false ? 'No / legal aid' : '—' },
+    { label: 'Police report',  value: data.policeReportFiled === true ? 'Filed' : data.policeReportFiled === false ? 'Not filed' : '—' },
+    { label: 'Referral status',value: data.referralNeeded === false ? 'Not needed' : data.referralAccepted === true ? 'Accepted' : data.referralAccepted === false ? 'Declined' : data.referralNeeded === true ? 'Needed' : '—' },
+  ];
+
+  return `<div class="case-brief">
+    <div class="brief-title">Case Brief</div>
+    <div class="brief-grid">
+      ${fields.map(f => `<div class="brief-item"><div class="brief-label">${f.label}</div><div class="brief-value">${f.value}</div></div>`).join('')}
+    </div>
+    ${data.incidentSummary ? `<div class="brief-summary">${data.incidentSummary}</div>` : ''}
+  </div>`;
+}
+
+// ── SESSION DETAIL ────────────────────────────────────────
+async function loadDetail(sessionId) {
+  selectedId = sessionId;
+  document.querySelectorAll('.session-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.id === sessionId);
+  });
+  $('emptystate').style.display = 'none';
+  const det = $('sessiondetail');
+  det.style.display = 'block';
+  det.innerHTML = '<div class="detail-loading"><span class="spinner"></span>Loading session…</div>';
+
+  try {
+    const res  = await fetch(`${API}/session/${sessionId}`);
+    const data = await res.json();
+    renderDetail(data);
+  } catch {
+    det.innerHTML = '<div class="detail-error">Failed to load session. Please try again.</div>';
+  }
+}
+
+function renderDetail(data) {
+  const det = $('sessiondetail');
+  const isCriminal = data.legalDomain === 'criminal';
+  const flagCount  = data.riskFlags?.length ?? 0;
+  const factCount  = data.extractedFacts?.length ?? 0;
+  const fileCount  = data.uploadedFiles?.length ?? 0;
+  const msgCount   = data.transcript?.length ?? 0;
+
+  // Header
+  const title = formatIssueType(data.legalIssueType) || 'Legal Intake Session';
+  const metaPills = [
+    data.jurisdiction    ? `📍 ${data.jurisdiction}` : null,
+    data.urgencyLevel    ? `${data.urgencyLevel.charAt(0).toUpperCase()+data.urgencyLevel.slice(1)} urgency` : null,
+    data.clientRole      ? `Role: ${data.clientRole}` : null,
+    PHASE_LABELS[data.currentPhase] ? `Phase: ${PHASE_LABELS[data.currentPhase]}` : null,
+    `${data.turnCount ?? 0} turns`,
+    `ID: ${data.sessionId.substring(0,8)}…`,
+  ].filter(Boolean);
+
+  // Scores
+  const gaugesHTML = `
+    <div class="section">
+      <div class="section-title">Litmetrics Scores</div>
+      <div class="gauges-row">
+        ${renderGauge('Liability', data.liabilityScore, 'var(--terracotta)')}
+        ${renderGauge('Case Strength', data.caseStrengthScore, 'var(--sage)')}
+        ${!isCriminal ? renderGauge('Settlement', data.settlementLikelihoodScore, '#7B68EE') : ''}
+      </div>
+      <div class="sol-row">
+        <span class="sol-label">Statute of Limitations:</span>
+        <span class="sol-value ${data.statuteOfLimitationsFlag ? 'sol-'+data.statuteOfLimitationsFlag+'-val' : 'sol-empty'}">
+          ${data.statuteOfLimitationsFlag || 'Not assessed'}
+        </span>
+        ${data.liabilityScore == null ? '<span style="margin-left:auto;font-size:11px;color:var(--charcoal-soft)">Scores computed at session completion</span>' : ''}
+      </div>
+    </div>`;
+
+  // Risk Flags
+  const flagsHTML = `
+    <div class="section">
+      <div class="section-title">Risk Flags <span class="section-count">${flagCount}</span></div>
+      ${flagCount ? `<ul class="flag-list">${(data.riskFlags||[]).map(f => {
+        const isCrit = f.startsWith('URGENT');
+        const isWarn = f.startsWith('Urgent') || f.toLowerCase().includes('warning');
+        return `<li class="flag-item ${isCrit ? 'flag-critical' : isWarn ? 'flag-warning' : 'flag-info'}">
+          <span class="flag-icon">${isCrit ? '⚠️' : isWarn ? '△' : '○'}</span>${f}
+        </li>`;
+      }).join('')}</ul>` : '<p class="no-flags">No risk flags for this session.</p>'}
+    </div>`;
+
+  // Case Facts
+  const factsHTML = `
+    <div class="section">
+      <div class="section-title">Case Facts <span class="section-count">${factCount}</span></div>
+      ${factCount ? `<div class="facts-grid">${(data.extractedFacts||[]).map(f => {
+        const idx = f.indexOf(':');
+        const label = idx >= 0 ? f.substring(0,idx).trim() : f;
+        const value = idx >= 0 ? f.substring(idx+1).trim() : '';
+        return `<div class="fact-row"><span class="fact-label">${label}</span><span class="fact-value">${value}</span></div>`;
+      }).join('')}</div>` : '<p class="facts-pending">Facts are extracted when the session reaches wrap-up.</p>'}
+    </div>`;
+
+  // Timeline
+  const currentIdx = PHASE_ORDER.indexOf(data.currentPhase);
+  const timelineHTML = `
+    <div class="section">
+      <div class="section-title">Case Timeline</div>
+      <div class="timeline">${PHASE_ORDER.filter(p => p !== 'done').map((p, i) => {
+        const state = i < currentIdx ? 'completed' : i === currentIdx ? 'active' : 'pending';
+        return `<div class="tl-step ${state}">
+          <div class="tl-dot"></div>
+          <div class="tl-label">${PHASE_LABELS[p]}</div>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+
+  // Uploaded Files
+  const filesHTML = `
+    <div class="section">
+      <div class="section-title">Uploaded Files <span class="section-count">${fileCount}</span></div>
+      ${fileCount ? `<div class="file-list">${(data.uploadedFiles||[]).map(f => `
+        <div class="file-card">
+          <div class="file-icon">${fileIcon(f.mimeType)}</div>
+          <div class="file-info">
+            <div class="file-name">${f.originalName}</div>
+            ${f.description ? `<div class="file-desc">${f.description}</div>` : ''}
+            <div class="file-meta">${formatBytes(f.size)} · ${new Date(f.uploadedAt).toLocaleDateString()}</div>
+          </div>
+        </div>`).join('')}</div>` : '<p class="no-files">No files uploaded in this session.</p>'}
+    </div>`;
+
+  // Transcript
+  const transcript = data.transcript || [];
+  const transcriptHTML = `
+    <div class="section">
+      <div class="section-title">Conversation Transcript <span class="section-count">${msgCount}</span></div>
+      ${msgCount ? `<div class="transcript-log">${transcript.map(m => `
+        <div class="transcript-entry ${m.role}">
+          <div class="t-header">
+            <span class="t-role">${m.role === 'assistant' ? 'Litmetrics' : 'Client'}</span>
+            <span class="t-time">${m.timestamp ? new Date(m.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''}</span>
+          </div>
+          <p class="t-content">${m.content}</p>
+        </div>`).join('')}</div>` : '<p class="no-files">No messages yet.</p>'}
+    </div>`;
+
+  det.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-title">${title}</div>
+        <div class="detail-meta">${metaPills.map(p => `<span class="detail-meta-pill">${p}</span>`).join('')}</div>
+      </div>
+    </div>
+    ${renderCaseBrief(data)}
+    ${gaugesHTML}
+    ${flagsHTML}
+    ${factsHTML}
+    ${timelineHTML}
+    ${filesHTML}
+    ${transcriptHTML}`;
+}
+
+// ── BOOT ─────────────────────────────────────────────────
+loadSessions();
+</script>
+</body>
+</html>

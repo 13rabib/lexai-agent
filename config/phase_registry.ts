@@ -68,7 +68,7 @@ export const phaseRegistry: Record<Phase, PhaseConfig> = {
   // Turn limit: 6 — enough for a slow or hesitant user to orient themselves.
   // -------------------------------------------------------------------------
   intake: {
-    maxTurns: 6,
+    maxTurns: 4,
     nextPhase: "situation",
     label: "Initial intake",
     step: 0,
@@ -87,7 +87,7 @@ export const phaseRegistry: Record<Phase, PhaseConfig> = {
   // Turn limit: 8 — criminal cases often need more back-and-forth.
   // -------------------------------------------------------------------------
   situation: {
-    maxTurns: 8,
+    maxTurns: 5,
     nextPhase: "insurance",
     label: "Your situation",
     step: 1,
@@ -109,7 +109,7 @@ export const phaseRegistry: Record<Phase, PhaseConfig> = {
   // Note: account numbers, SSN, DOB are NEVER collected.
   // -------------------------------------------------------------------------
   insurance: {
-    maxTurns: 6,
+    maxTurns: 3,
     nextPhase: "witnesses",
     label: "Insurance & finances",
     step: 2,
@@ -127,7 +127,7 @@ export const phaseRegistry: Record<Phase, PhaseConfig> = {
   // Turn limit: 8 — evidence inventory can be extensive in criminal cases.
   // -------------------------------------------------------------------------
   witnesses: {
-    maxTurns: 8,
+    maxTurns: 4,
     nextPhase: "guidance",
     label: "Witnesses & evidence",
     step: 3,
