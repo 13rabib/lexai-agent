@@ -148,8 +148,8 @@ function loadPhaseAnalyzerInstructions(phase: Phase): string {
   if (instructionCache[phase]) return instructionCache[phase]!;
 
   const filePath = path.resolve(
-    __dirname,
-    `../../phases/${phase}/analyzer.md`
+    process.cwd(),
+    `phases/${phase}/analyzer.md`
   );
 
   try {

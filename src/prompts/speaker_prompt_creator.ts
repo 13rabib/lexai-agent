@@ -311,8 +311,8 @@ function loadPhaseSpeakerInstructions(phase: Phase): string {
   if (instructionCache[phase]) return instructionCache[phase]!;
 
   const filePath = path.resolve(
-    __dirname,
-    `../../phases/${phase}/speaker.md`
+    process.cwd(),
+    `phases/${phase}/speaker.md`
   );
 
   try {

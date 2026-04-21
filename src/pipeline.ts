@@ -336,8 +336,38 @@ app.get("/session/:sessionId", async (req: Request, res: Response) => {
   res.json({ ...state, uploadedFiles: state.uploadedFiles.map(f => ({ id: f.id, originalName: f.originalName, mimeType: f.mimeType, size: f.size, uploadedAt: f.uploadedAt, description: f.description })), transcript: state.messages });
 });
 
+function computeRiskLevel(urgencyLevel: string | null, riskFlags: string[]): string {
+  if (urgencyLevel === "emergency") return "Critical";
+  const hasUrgent = riskFlags.some(f => f.toLowerCase().startsWith("urgent") || f.toLowerCase().includes("high-severity"));
+  if (hasUrgent || urgencyLevel === "urgent") return "High";
+  if (riskFlags.length >= 3) return "Medium";
+  if (riskFlags.length > 0) return "Low";
+  return "Low";
+}
+
+function extractKeyFacts(s: Record<string, unknown>): string[] {
+  const facts: string[] = [];
+  if (s.incidentSummary) {
+    const summary = s.incidentSummary as string;
+    facts.push(summary.length > 50 ? summary.substring(0, 50) + "..." : summary);
+  }
+  if (s.incidentLocation) facts.push(`Location: ${s.incidentLocation}`);
+  if (s.policeReportFiled === true) facts.push("Police report filed");
+  else if (s.policeReportFiled === false) facts.push("No police report");
+  return facts.slice(0, 3);
+}
+
 app.get("/sessions", async (_req: Request, res: Response) => {
-  try { res.json(await dbListSessions()); }
+  try {
+    const sessions = await dbListSessions();
+    const enriched = sessions.map((s) => ({
+      ...s,
+      riskLevel: computeRiskLevel(s.urgencyLevel, s.riskFlags),
+      keyFacts: extractKeyFacts(s),
+      status: s.currentPhase === "done" ? "Completed" : `In Progress (${s.currentPhase})`,
+    }));
+    res.json(enriched);
+  }
   catch (err) { logError("[Sessions]", "Failed to list sessions", err); res.status(500).json({ error: PIPELINE_ERROR.userMessage }); }
 });
 
