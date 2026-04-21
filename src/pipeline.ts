@@ -368,7 +368,7 @@ app.get("/sessions", async (_req: Request, res: Response) => {
     }));
     res.json(enriched);
   }
-  catch (err) { logError("[Sessions]", "Failed to list sessions", err); res.status(500).json({ error: PIPELINE_ERROR.userMessage }); }
+  catch (err) { logError("[Sessions]", "Failed to list sessions", err); res.status(500).json({ error: String(err) }); }
 });
 
 app.delete("/session/:sessionId", async (req: Request, res: Response) => {
