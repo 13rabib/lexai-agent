@@ -442,7 +442,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 initDb().then(() => {
   app.listen(PORT, () => {
-    logInfo("[Startup]", `LexAI running on http://localhost:${PORT}`);
+    logInfo("[Startup]", `LexAI running on http://localhost:${PORT}`); logInfo("[Startup]", `CWD: ${process.cwd()}`); logInfo("[Startup]", `Phases exist: ${require("fs").existsSync(require("path").join(process.cwd(), "phases"))}`);
     logInfo("[Startup]", `STT: ${DEEPGRAM_API_KEY ? "enabled" : "disabled"} | TTS: ${ELEVENLABS_API_KEY ? "enabled" : "disabled"} | Search: ${TAVILY_API_KEY ? "enabled" : "disabled"}`);
     logInfo("[Startup]", `DB: ${process.env.TURSO_DATABASE_URL ?? DB_PATH}`);
   });
