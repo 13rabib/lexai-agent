@@ -886,12 +886,20 @@ function startMediaRecorder(stream) {
 
 function startSilenceDetection() {
   silenceStart = null;
+  let recentVols = [];
+  let peakVol = 0;
   silenceTimer = setInterval(() => {
     if (!analyserNode || !isRecording) return;
     const data = new Uint8Array(analyserNode.frequencyBinCount);
     analyserNode.getByteFrequencyData(data);
     const vol = data.reduce((a,b) => a+b, 0) / data.length;
-    if (vol < SILENCE_THRESH) {
+    recentVols.push(vol);
+    if (recentVols.length > 20) recentVols.shift();
+    if (vol > peakVol) peakVol = vol;
+    const avgRecent = recentVols.reduce((a,b) => a+b, 0) / recentVols.length;
+    const threshold = Math.max(SILENCE_THRESH, peakVol * 0.25);
+    const isSilent = vol < threshold && avgRecent < threshold;
+    if (isSilent && peakVol > SILENCE_THRESH * 2) {
       if (!silenceStart) silenceStart = Date.now();
       const elapsed = Date.now() - silenceStart;
       const remaining = Math.max(0, SILENCE_MS - elapsed);
@@ -899,7 +907,7 @@ function startSilenceDetection() {
       if (elapsed >= SILENCE_MS) { clearSilenceTimer(); stopVoice(); }
     } else {
       silenceStart = null;
-      voicesub.textContent = 'Speak clearly — I\'m here';
+      if (vol > SILENCE_THRESH) voicesub.textContent = 'Speak clearly — I\'m here';
     }
   }, 100);
 }
