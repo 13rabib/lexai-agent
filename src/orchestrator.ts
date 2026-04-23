@@ -59,6 +59,10 @@ export function orchestrate(
   // Copy merged phase fields back into updates
   copyMergedFields(merged, updates, state.currentPhase);
 
+  // Passively capture any cross-phase fields the user volunteered early
+  passiveCrossPhaseCapture(merged, analyzerOutput, state.currentPhase);
+  copyPassiveFields(merged, updates, state.currentPhase);
+
   // -------------------------------------------------------------------------
   // Step 3 — Recompute risk flags from scratch
   // -------------------------------------------------------------------------
@@ -348,6 +352,94 @@ function copyMergedFields(
 }
 
 // ---------------------------------------------------------------------------
+// passiveCrossPhaseCapture
+// When users volunteer info from future phases early (e.g. "I have insurance"
+// during intake), capture it so those phases can transition faster and the
+// speaker doesn't re-ask for things already mentioned.
+// Only sets fields that are currently empty — never overwrites.
+// ---------------------------------------------------------------------------
+
+function passiveCrossPhaseCapture(
+  merged: LegalAgentState,
+  out: Record<string, unknown>,
+  currentPhase: Phase
+): void {
+  // Helper: read both direct key and _passive_ prefixed key
+  const p = (key: string) => out[`_passive_${key}`] ?? out[key];
+
+  // From intake: passively capture situation fields
+  if (currentPhase === "intake") {
+    if (isNonEmptyString(p("incidentSummary")) && !isSet(merged.incidentSummary))
+      merged.incidentSummary = p("incidentSummary") as string;
+    if (isNonEmptyString(p("incidentDate")) && !isSet(merged.incidentDate))
+      merged.incidentDate = p("incidentDate") as string;
+    if (isNonEmptyString(p("incidentLocation")) && !isSet(merged.incidentLocation))
+      merged.incidentLocation = p("incidentLocation") as string;
+    if (isNonEmptyString(p("clientRole")) && !isSet(merged.clientRole))
+      merged.clientRole = p("clientRole") as string;
+    if (isNonEmptyString(p("timeline")) && !isSet(merged.timeline))
+      merged.timeline = p("timeline") as string;
+    const parties = p("partiesInvolved");
+    if (Array.isArray(parties) && parties.length > 0)
+      merged.partiesInvolved = dedupe([...merged.partiesInvolved, ...(parties as unknown[]).filter(isNonEmptyString) as string[]]);
+    const evidence = p("evidenceNoted");
+    if (Array.isArray(evidence) && evidence.length > 0)
+      merged.evidenceNoted = dedupe([...merged.evidenceNoted, ...(evidence as unknown[]).filter(isNonEmptyString) as string[]]);
+  }
+
+  // From intake or situation: passively capture insurance/financial fields
+  if (currentPhase === "intake" || currentPhase === "situation") {
+    if (isValidString(p("insuranceCoverageType"), ["auto","homeowners","renters","health","liability","workers-comp","none","unknown"]) && !isSet(merged.insuranceCoverageType))
+      merged.insuranceCoverageType = p("insuranceCoverageType") as InsuranceCoverageType;
+    if (typeof p("canAffordAttorney") === "boolean" && merged.canAffordAttorney === null)
+      merged.canAffordAttorney = p("canAffordAttorney") as boolean;
+    if (typeof p("insuranceClaimFiled") === "boolean" && merged.insuranceClaimFiled === null)
+      merged.insuranceClaimFiled = p("insuranceClaimFiled") as boolean;
+    if (isNonEmptyString(p("estimatedDamages")) && !isSet(merged.estimatedDamages))
+      merged.estimatedDamages = p("estimatedDamages") as string;
+  }
+
+  // From any phase before witnesses: passively capture police/evidence fields
+  if (currentPhase === "intake" || currentPhase === "situation" || currentPhase === "insurance") {
+    if (typeof p("policeReportFiled") === "boolean" && merged.policeReportFiled === null)
+      merged.policeReportFiled = p("policeReportFiled") as boolean;
+    if (typeof p("hasDigitalEvidence") === "boolean" && merged.hasDigitalEvidence === null)
+      merged.hasDigitalEvidence = p("hasDigitalEvidence") as boolean;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// copyPassiveFields
+// Copies passively-captured cross-phase fields from merged → updates.
+// ---------------------------------------------------------------------------
+
+function copyPassiveFields(
+  merged: LegalAgentState,
+  updates: Partial<LegalAgentState>,
+  currentPhase: Phase
+): void {
+  if (currentPhase === "intake") {
+    updates.incidentSummary  = merged.incidentSummary;
+    updates.incidentDate     = merged.incidentDate;
+    updates.incidentLocation = merged.incidentLocation;
+    updates.clientRole       = merged.clientRole;
+    updates.timeline         = merged.timeline;
+    updates.partiesInvolved  = merged.partiesInvolved;
+    updates.evidenceNoted    = merged.evidenceNoted;
+  }
+  if (currentPhase === "intake" || currentPhase === "situation") {
+    updates.insuranceCoverageType = merged.insuranceCoverageType;
+    updates.canAffordAttorney     = merged.canAffordAttorney;
+    updates.insuranceClaimFiled   = merged.insuranceClaimFiled;
+    updates.estimatedDamages      = merged.estimatedDamages;
+  }
+  if (currentPhase === "intake" || currentPhase === "situation" || currentPhase === "insurance") {
+    updates.policeReportFiled  = merged.policeReportFiled;
+    updates.hasDigitalEvidence = merged.hasDigitalEvidence;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // computeRiskFlags
 // Recomputed from scratch every turn. Flags can appear and clear.
 // Domain-aware: some flags only apply to criminal, others to civil.
@@ -421,6 +513,21 @@ export function computeRiskFlags(state: LegalAgentState): string[] {
 
   if (state.policeReportFiled === false && isCivil && atOrPastGuidance)
     flags.push("No police report filed — may be required for civil claim");
+
+  // --- Informal settlement / cash offer detection ---
+  // Scan recent user messages for patterns indicating a defendant has offered money
+  const recentUserMessages = state.messages
+    .filter(m => m.role === "user")
+    .slice(-12)
+    .map(m => m.content.toLowerCase());
+  const settlementKeywords = ["offered", "offering", "cash offer", "pay me", "pay you", "settlement", "hush money", "paying me", "gave me money"];
+  const hasCashOfferContext = recentUserMessages.some(text =>
+    settlementKeywords.some(kw => text.includes(kw)) &&
+    (text.includes("$") || text.includes("dollar") || text.includes("money") || text.includes("cash") || text.includes("paid") || text.includes("amount"))
+  );
+  if (hasCashOfferContext) {
+    flags.push("CRITICAL: Informal settlement offer detected — advise client NOT to accept any payment or sign anything before consulting an attorney");
+  }
 
   // --- Attorney referral ---
   if (state.referralNeeded === true && state.referralAccepted === false)
