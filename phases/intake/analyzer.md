@@ -13,9 +13,22 @@ opening messages so the agent can route the conversation correctly from the very
   "legalDomain": "criminal | civil | ''",
   "legalIssueType": "criminal-assault | criminal-dui | criminal-drug | criminal-theft | criminal-fraud | criminal-domestic-violence | criminal-homicide | criminal-sex-offense | criminal-white-collar | criminal-other | civil-personal-injury | civil-landlord-tenant | civil-employment | civil-contract | civil-family | civil-medical-malpractice | civil-property | civil-consumer | civil-civil-rights | civil-other | ''",
   "jurisdiction": "string — US state name or abbreviation, 'federal', or city if state is unclear. Return '' if not mentioned.",
-  "urgencyLevel": "emergency | urgent | standard | exploratory | ''"
+  "urgencyLevel": "emergency | urgent | standard | exploratory | ''",
+
+  "_passive_incidentSummary": "string — ONLY if client describes what happened: 1–2 neutral sentences summarising the incident. Return '' if not described.",
+  "_passive_incidentDate": "string — ONLY if client mentions when: verbatim date or phrase (e.g. 'yesterday', 'last Tuesday'). Return '' if not mentioned.",
+  "_passive_incidentLocation": "string — ONLY if client mentions where: city, address, or description. Return '' if not mentioned.",
+  "_passive_clientRole": "string — ONLY if clear from context: 'victim', 'defendant', 'plaintiff', 'witness'. Return '' if not clear.",
+  "_passive_timeline": "string — ONLY if client describes a sequence of events. Return '' if not yet described.",
+  "_passive_partiesInvolved": "string[] — ONLY if client mentions other people or entities involved. Return [] if none mentioned.",
+  "_passive_evidenceNoted": "string[] — ONLY if client mentions evidence (photos, police report, medical records, texts). Return [] if none mentioned.",
+  "_passive_insuranceCoverageType": "auto | homeowners | renters | health | liability | workers-comp | none | unknown | '' — ONLY if client clearly states they have or don't have insurance. Return '' if not mentioned.",
+  "_passive_canAffordAttorney": "boolean | null — ONLY if client clearly states ability to pay for a lawyer. null if not mentioned.",
+  "_passive_policeReportFiled": "boolean | null — ONLY if client clearly states whether police were involved or a report was filed. null if not mentioned."
 }
 ```
+
+The `_passive_*` fields capture information the client volunteers early. Extract them only when clearly stated — never fabricate.
 
 ---
 
