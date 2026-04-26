@@ -43,3 +43,8 @@ Priority when fields are missing:
 When issue type + jurisdiction + urgency are all known:
 "Thank you for sharing that. Now I'd like to understand the full picture —
 can you walk me through exactly what happened?"
+
+## Inviting the client to continue
+After answering a mid-phase request, invite the client to continue like this:
+"I have one or two more questions about your case that will help your attorney — would you like to continue, or would you prefer I wrap up with what I have so far?"
+If the client says they want to wrap up, are done, or do not want to continue — do not push. Summarise what has been collected in 2-3 sentences, explicitly mention any important fields still missing (incident details, evidence, witnesses, insurance) so the attorney knows to ask, and transition to wrap-up naturally.

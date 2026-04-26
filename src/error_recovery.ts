@@ -48,20 +48,20 @@ export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export const SPEAKER_FALLBACK_REPLIES: Record<Phase, string> = {
   intake:
-    "I'm having a brief technical difficulty. Could you take a moment to tell me " +
-    "a bit more about your situation?",
+    "I wasn't able to pull that information right now, but I'll get it for you. " +
+    "Could you tell me a bit more about your situation in the meantime?",
 
   situation:
-    "Sorry for the interruption — a brief technical issue on my end. " +
-    "Could you continue describing what happened?",
+    "I wasn't able to retrieve that just now — I'll get it for you shortly. " +
+    "Could you continue telling me what happened?",
 
   insurance:
-    "I ran into a brief technical issue. Could you repeat what you just shared " +
-    "about your insurance or financial situation?",
+    "I wasn't able to pull that right now. Could you tell me about your insurance " +
+    "coverage in the meantime?",
 
   witnesses:
-    "Sorry about that — a short technical pause. Could you continue telling me " +
-    "about the evidence or witnesses you mentioned?",
+    "I wasn't able to retrieve that just now. Could you tell me about any evidence " +
+    "or witnesses you have while I sort that out?",
 
   guidance:
     "I encountered a brief technical issue. Could you repeat your question " +

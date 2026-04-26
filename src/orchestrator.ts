@@ -270,6 +270,16 @@ function mergeByPhase(
       if (out.userAcknowledgedDisclaimer === true)
         merged.disclaimerInjected = true;
 
+      // Late capture — pick up high-value fields if client shared them during wrap-up
+      if (Array.isArray(out.partiesInvolved) && out.partiesInvolved.length)
+        merged.partiesInvolved = dedupe([...merged.partiesInvolved, ...(out.partiesInvolved as string[])]);
+      if (Array.isArray(out.evidenceNoted) && out.evidenceNoted.length)
+        merged.evidenceNoted = dedupe([...merged.evidenceNoted, ...(out.evidenceNoted as string[])]);
+      if (typeof out.policeReportFiled === "boolean")
+        merged.policeReportFiled = out.policeReportFiled;
+      if (typeof out.incidentSummary === "string" && out.incidentSummary && !merged.incidentSummary)
+        merged.incidentSummary = out.incidentSummary as string;
+
       if (Array.isArray(out.nextStepsProvided)) {
         const steps = out.nextStepsProvided.filter(isNonEmptyString) as string[];
         merged.nextStepsProvided = [...merged.nextStepsProvided, ...steps];
