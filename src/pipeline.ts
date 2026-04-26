@@ -65,11 +65,28 @@ async function dbSaveSession(state: LegalAgentState): Promise<void> {
 }
 
 async function dbListSessions() {
-  const result = await turso.execute("SELECT state_json FROM sessions ORDER BY updated_at DESC LIMIT 100");
+  const result = await turso.execute(
+    "SELECT session_id, created_at, updated_at, " +
+    "json_extract(state_json, '$.currentPhase') as phase, " +
+    "json_extract(state_json, '$.legalIssueType') as legalIssueType, " +
+    "json_extract(state_json, '$.legalDomain') as legalDomain, " +
+    "json_extract(state_json, '$.jurisdiction') as jurisdiction, " +
+    "json_extract(state_json, '$.urgencyLevel') as urgencyLevel, " +
+    "json_extract(state_json, '$.liabilityScore') as liabilityScore, " +
+    "json_extract(state_json, '$.caseStrengthScore') as caseStrengthScore, " +
+    "json_extract(state_json, '$.settlementLikelihoodScore') as settlementLikelihoodScore, " +
+    "json_extract(state_json, '$.statuteOfLimitationsFlag') as statuteOfLimitationsFlag, " +
+    "json_extract(state_json, '$.riskFlags') as riskFlags, " +
+    "json_extract(state_json, '$.turnCount') as turnCount, " +
+    "json_extract(state_json, '$.incidentSummary') as incidentSummary, " +
+    "json_extract(state_json, '$.incidentLocation') as incidentLocation, " +
+    "json_extract(state_json, '$.policeReportFiled') as policeReportFiled " +
+    "FROM sessions ORDER BY updated_at DESC LIMIT 50"
+  );
   return result.rows.flatMap((row) => {
     try {
-      const s = JSON.parse(row.state_json as string) as LegalAgentState;
-      return [{ sessionId: s.sessionId, currentPhase: s.currentPhase, turnCount: s.turnCount, legalDomain: s.legalDomain, legalIssueType: s.legalIssueType, jurisdiction: s.jurisdiction, urgencyLevel: s.urgencyLevel, riskFlags: s.riskFlags ?? [], liabilityScore: s.liabilityScore, caseStrengthScore: s.caseStrengthScore, settlementLikelihoodScore: s.settlementLikelihoodScore, statuteOfLimitationsFlag: s.statuteOfLimitationsFlag, incidentSummary: s.incidentSummary, incidentLocation: s.incidentLocation, policeReportFiled: s.policeReportFiled, createdAt: s.createdAt, updatedAt: s.updatedAt }];
+      const riskFlags = row.riskFlags ? JSON.parse(row.riskFlags as string) : [];
+      return [{ sessionId: row.session_id as string, currentPhase: row.phase as string, turnCount: Number(row.turnCount ?? 0), legalDomain: row.legalDomain as string, legalIssueType: row.legalIssueType as string, jurisdiction: row.jurisdiction as string, urgencyLevel: row.urgencyLevel as string, riskFlags: Array.isArray(riskFlags) ? riskFlags : [], liabilityScore: row.liabilityScore as number | null, caseStrengthScore: row.caseStrengthScore as number | null, settlementLikelihoodScore: row.settlementLikelihoodScore as number | null, statuteOfLimitationsFlag: row.statuteOfLimitationsFlag as string | null, incidentSummary: row.incidentSummary as string, incidentLocation: row.incidentLocation as string, policeReportFiled: row.policeReportFiled as boolean | null, createdAt: row.created_at as string, updatedAt: row.updated_at as string }];
     } catch { return []; }
   });
 }
